@@ -7,22 +7,61 @@ import {
   Text,
   VStack,
   ScrollView,
+  useToast,
 } from "native-base";
 import { TouchableOpacity } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { AppNavigatorRoutesProps } from "@routes/app.routes";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import BodySvg from "@assets/body.svg";
 import SeriesSvg from "@assets/series.svg";
 import RepetitionSvg from "@assets/repetitions.svg";
 import { Button } from "@components/Button";
+import { AppError } from "@utils/AppError";
+import { api } from "@services/api";
+import { useEffect, useState } from "react";
+import { ExerciseDTO } from "@dtos/ExerciseDTO";
+import { Loading } from "@components/Loading";
+
+type RouteParamsProps = {
+  exerciseId: string;
+};
 
 export function Exercise() {
+  const [isLoading, setIsLoading] = useState(true);
   const { goBack } = useNavigation<AppNavigatorRoutesProps>();
+  const toast = useToast();
+  const route = useRoute();
+  const { exerciseId } = route.params as RouteParamsProps;
+  const [exercise, setExercise] = useState<ExerciseDTO>({} as ExerciseDTO);
 
   function handleGoBack() {
     goBack();
   }
+
+  async function fecthExerciseDetails() {
+    try {
+      setIsLoading(true);
+      const response = await api.get(`/exercises/${exerciseId}`);
+      setExercise(response.data);
+    } catch (error) {
+      const isAppError = error instanceof AppError;
+      const title = isAppError
+        ? error.message
+        : "Não foi possível carregar os detalhes do exercício";
+      toast.show({
+        title,
+        placement: "top",
+        bgColor: "red.500",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fecthExerciseDetails();
+  }, [exerciseId]);
 
   return (
     <VStack flex={1}>
@@ -49,58 +88,64 @@ export function Exercise() {
             fontFamily="heading"
             flexShrink={1}
           >
-            Puxada Frontal
+            {exercise.name}
           </Heading>
 
           <HStack alignItems="center">
             <BodySvg />
             <Text color="gray.200" ml={1} textTransform="capitalize">
-              Costas
+              {exercise.group}
             </Text>
           </HStack>
         </HStack>
       </VStack>
 
-      <ScrollView>
-        <VStack p={8}>
-          <Image
-            w="full"
-            h={80}
-            source={{
-              uri: "http://conteudo.imguol.com.br/c/entretenimento/0c/2019/12/03/remada-unilateral-com-halteres-1575402100538_v2_600x600.jpg",
-            }}
-            mb={3}
-            alt="Nome do exercício"
-            resizeMode="cover"
-            rounded="lg"
-          />
+      {isLoading ? (
+        <Loading />
+      ) : (
+        <ScrollView>
+          <VStack p={8}>
+            <Box rounded="lg" mb={3} overflow="hidden">
+              <Image
+                w="full"
+                h={80}
+                source={{
+                  uri: `${api.defaults.baseURL}exercise/demo/${exercise.demo}`,
+                }}
+                mb={3}
+                alt="Nome do exercício"
+                resizeMode="cover"
+                rounded="lg"
+              />
+            </Box>
 
-          <Box bg="gray.600" rounded="md" pb={4} px={4}>
-            <HStack
-              alignItems="center"
-              justifyContent="space-around"
-              mb={6}
-              mt={5}
-            >
-              <HStack>
-                <SeriesSvg />
-                <Text color="gray.200" ml="2">
-                  3 séries
-                </Text>
+            <Box bg="gray.600" rounded="md" pb={4} px={4}>
+              <HStack
+                alignItems="center"
+                justifyContent="space-around"
+                mb={6}
+                mt={5}
+              >
+                <HStack>
+                  <SeriesSvg />
+                  <Text color="gray.200" ml="2">
+                    {exercise.series} séries
+                  </Text>
+                </HStack>
+
+                <HStack>
+                  <SeriesSvg />
+                  <Text color="gray.200" ml="2">
+                    {exercise.repetitions} repetições
+                  </Text>
+                </HStack>
               </HStack>
 
-              <HStack>
-                <SeriesSvg />
-                <Text color="gray.200" ml="2">
-                  12 repetições
-                </Text>
-              </HStack>
-            </HStack>
-
-            <Button title="Marcar como realizado" />
-          </Box>
-        </VStack>
-      </ScrollView>
+              <Button title="Marcar como realizado" />
+            </Box>
+          </VStack>
+        </ScrollView>
+      )}
     </VStack>
   );
 }
