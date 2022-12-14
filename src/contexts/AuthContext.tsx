@@ -17,8 +17,10 @@ import { err } from "react-native-svg/lib/typescript/xml";
 export type AuthContextDataProps = {
   user: UserDTO;
   signIn: (email: string, password: string) => Promise<void>;
+  updateUserProfile: (userUpdated: UserDTO) => Promise<void>;
   signOut: () => Promise<void>;
   isLoadingUserStorageData: boolean;
+  refreshedToken: string;
 };
 
 export const AuthContext = createContext<AuthContextDataProps>(
@@ -31,6 +33,7 @@ type AuthContextProviderProps = {
 
 export function AuthContextProvider(props: AuthContextProviderProps) {
   const [user, setUser] = useState<UserDTO>({} as UserDTO);
+  const [refreshedToken, setRefreshedToken] = useState("");
   const [isLoadingUserStorageData, setIsLoadingUserStorageData] =
     useState(true);
 
@@ -77,6 +80,15 @@ export function AuthContextProvider(props: AuthContextProviderProps) {
     }
   }
 
+  async function updateUserProfile(userUpdated: UserDTO) {
+    try {
+      setUser(userUpdated);
+      await storageUserSave(userUpdated);
+    } catch (error) {
+      throw error;
+    }
+  }
+
   async function loadUserData() {
     try {
       setIsLoadingUserStorageData(true);
@@ -93,13 +105,34 @@ export function AuthContextProvider(props: AuthContextProviderProps) {
     }
   }
 
+  function refreshTokenUpdated(newToken: string) {
+    setRefreshedToken(newToken);
+  }
+
   useEffect(() => {
     loadUserData();
   }, []);
 
+  useEffect(() => {
+    const subscribe = api.registerInterceptTokenManager({
+      signOut,
+      refreshTokenUpdated,
+    });
+    return () => {
+      subscribe();
+    };
+  }, [signOut]);
+
   return (
     <AuthContext.Provider
-      value={{ user, signIn, signOut, isLoadingUserStorageData }}
+      value={{
+        user,
+        signIn,
+        signOut,
+        refreshedToken,
+        updateUserProfile,
+        isLoadingUserStorageData,
+      }}
     >
       {props.children}
     </AuthContext.Provider>
